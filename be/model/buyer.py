@@ -4,7 +4,7 @@ import json
 import logging
 from be.model import db_conn
 from be.model import error
-import pymongo
+import pymongo.errors
 
 
 class Buyer(db_conn.DBConn):
@@ -72,11 +72,8 @@ class Buyer(db_conn.DBConn):
             # )
             self.conn.new_order_col.insert_one({"order_id": uid, "store_id": store_id, "user_id": user_id})
             order_id = uid
-        except pymongo.errors.PyMongoError as e:
-            logging.info("528, {}".format(str(e)))
-            return 528, "{}".format(str(e)), ""
+
         except BaseException as e:
-            logging.info("530, {}".format(str(e)))
             return 530, "{}".format(str(e)), ""
 
         return 200, "ok", order_id
@@ -150,8 +147,8 @@ class Buyer(db_conn.DBConn):
             result = conn.new_order_detail_col.find({"order_id": order_id}, {"book_id": 1, "count": 1, "price": 1})
             total_price = 0
             for row in result:
-                count = result["count"]
-                price = result["price"]
+                count = row["count"]
+                price = row["price"]
                 total_price = total_price + price * count
 
             if balance < total_price:
@@ -243,8 +240,6 @@ class Buyer(db_conn.DBConn):
             if result.modified_count == 0:
                 return error.error_non_exist_user_id(user_id)
 
-        except pymongo.errors.PyMongoError as e:
-            return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
 

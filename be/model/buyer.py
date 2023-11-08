@@ -178,7 +178,7 @@ class Buyer(db_conn.DBConn):
                 query_conditions["book_author"] = book_author
 
             # print(query_conditions)
-            result = self.conn.store_col.find(query_conditions, {})
+            result = self.conn.store_col.find(query_conditions, {}).limit(10)
 
             if not any(result):
                 return error.error_non_exist_book_id(book_id)

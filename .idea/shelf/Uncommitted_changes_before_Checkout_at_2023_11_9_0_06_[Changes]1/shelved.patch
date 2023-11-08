@@ -1,0 +1,39 @@
+Index: .idea/vcs.xml
+===================================================================
+diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+deleted file mode 100644
+--- a/.idea/vcs.xml	
++++ /dev/null	
+@@ -1,6 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<project version="4">
+-  <component name="VcsDirectoryMappings">
+-    <mapping directory="" vcs="Git" />
+-  </component>
+-</project>
+\ No newline at end of file
+Index: fe/access/book_search.py
+===================================================================
+diff --git a/fe/access/book_search.py b/fe/access/book_search.py
+deleted file mode 100644
+--- a/fe/access/book_search.py	
++++ /dev/null	
+@@ -1,18 +0,0 @@
+-import requests
+-from urllib.parse import urljoin
+-from fe.access import book
+-from fe.access.auth import Auth
+-
+-
+-class Booksearch:
+-    def __init__(self, url_prefix):
+-        self.url_prefix = urljoin(url_prefix, "booksearch/")
+-
+-    def book_search(self, store_id: str, book_info: book.Book):
+-        json = {
+-            "store_id": store_id,
+-            "book_info": book_info.__dict__
+-        }
+-        url = urljoin(self.url_prefix, "search_book")
+-        r = requests.post(url, json=json)
+-        return r.status_code, r.json().get("token")

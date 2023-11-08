@@ -76,7 +76,6 @@ class TestBookSearch:
     def test_book_not_exist(self):
         for bk in self.books:
             self.book_id = bk.__dict__.get("id") + "000"
-            print(self.book_id)
             code = self.buyer.book_search(self.search_store_id, self.book_id, self.book_title, self.book_tags,
                                           self.book_author)
             assert code != 200

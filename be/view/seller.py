@@ -42,3 +42,23 @@ def add_stock_level():
     code, message = s.add_stock_level(user_id, store_id, book_id, add_num)
 
     return jsonify({"message": message}), code
+
+
+# 接收搜索订单请求
+@bp_seller.route("/search_order", methods=["POST"])
+def search_order():
+    # 请求需传入user_id
+    user_id: str = request.json.get("user_id")
+    s = seller.Seller()
+    code, message = s.search_order(user_id)
+    return jsonify({"message": message}), code
+
+
+@bp_seller.route("/deliver", methods=["POST"])
+def deliver():
+    user_id: str = request.json.get("user_id")
+    order_id: str = request.json.get("order_id")
+    store_id: str = request.json.get("store_id")
+    s = seller.Seller()
+    code, message = s.deliver(user_id, store_id, order_id)
+    return jsonify({"message": message}), code

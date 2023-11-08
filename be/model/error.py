@@ -9,12 +9,12 @@ error_code = {
     517: "stock level low, book id {}",
     518: "invalid order id {}",
     519: "not sufficient funds, order id {}",
-    520: "",
-    521: "",
-    522: "",
-    523: "",
-    524: "",
-    525: "",
+    520: "non order to delete, user id {}",
+    521: "repay error, order id {}",
+    522: "non order to ste payment status, order id {}",
+    523: "non exist order, order id{}",
+    524: "unable to delete order, order id{}",
+    525: "empty order search, user id{}",
     526: "",
     527: "",
     528: "",
@@ -54,7 +54,31 @@ def error_invalid_order_id(order_id):
 
 
 def error_not_sufficient_funds(order_id):
-    return 519, error_code[518].format(order_id)
+    return 519, error_code[519].format(order_id)
+
+
+def error_non_order_delete(user_id):
+    return 520, error_code[520].format(user_id)
+
+
+def error_order_repay(order_id):
+    return 521, error_code[521].format(order_id)
+
+
+def error_non_order_pay(order_id):
+    return 522, error_code[522].format(order_id)
+
+
+def error_non_exist_order(order_id):
+    return 523, error_code[523].format(order_id)
+
+
+def error_unable_to_delete(order_id):
+    return 524, error_code[524].format(order_id)
+
+
+def empty_order_search(user_id):
+    return 525, error_code[525].format(user_id)
 
 
 def error_authorization_fail():

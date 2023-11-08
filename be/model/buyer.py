@@ -4,7 +4,9 @@ import json
 import logging
 from be.model import db_conn
 from be.model import error
-import pymongo.errors
+import pymongo
+import time
+from datetime import datetime
 
 
 class Buyer(db_conn.DBConn):
@@ -62,6 +64,7 @@ class Buyer(db_conn.DBConn):
                 #     "VALUES(?, ?, ?, ?);",
                 #     (uid, book_id, count, price),
                 # )
+                # 满足前置条件(书存在且购买数量符合的加入new_order_detail)
                 self.conn.new_order_detail_col.insert_one(
                     {"order_id": uid, "book_id": book_id, "count": count, "price": price})
 
@@ -70,9 +73,15 @@ class Buyer(db_conn.DBConn):
             #     "VALUES(?, ?, ?);",
             #     (uid, store_id, user_id),
             # )
-            self.conn.new_order_col.insert_one({"order_id": uid, "store_id": store_id, "user_id": user_id})
+            # 获取当前系统时间并计算截止时间
+            current_time = int(time.time())
+            payment_ddl = current_time + 15
+            # 插入该order基础信息与付款截止日期
+            self.conn.new_order_col.insert_one({
+                "order_id": uid, "store_id": store_id, "user_id": user_id,
+                "payment_status": "no_pay", "payment_ddl": payment_ddl
+            })
             order_id = uid
-
         except BaseException as e:
             return 530, "{}".format(str(e)), ""
 
@@ -88,7 +97,12 @@ class Buyer(db_conn.DBConn):
             # row = cursor.fetchone()
             # if row is None:
             #     return error.error_invalid_order_id(order_id)
+            # 查看对应order的支付状态
+            order = conn.new_order_col.find_one({"order_id": order_id})
+            if order['payment_status'] != "no_pay":
+                return
 
+            # 按照order_id查找user_id,store_id,buyer_id并存储
             row = conn.new_order_col.find_one({"order_id": order_id}, {"order_id": 1, "user_id": 1, "store_id": 1})
             if row is None:
                 return error.error_invalid_order_id(order_id)
@@ -96,7 +110,6 @@ class Buyer(db_conn.DBConn):
             # order_id = row[0]
             # buyer_id = row[1]
             # store_id = row[2]
-
             order_id = row["order_id"]
             buyer_id = row["user_id"]
             store_id = row["store_id"]
@@ -114,6 +127,7 @@ class Buyer(db_conn.DBConn):
             # if password != row[1]:
             #     return error.error_authorization_fail()
 
+            # 基于buyer_id查找balance(用户余额)与password,并判断password是否正确
             result = conn.user_col.find_one({"user_id": buyer_id}, {"balance": 1, "password": 1})
             if result is None:
                 return error.error_non_exist_user_id(buyer_id)
@@ -131,6 +145,7 @@ class Buyer(db_conn.DBConn):
 
             # seller_id = row[1]
 
+            # 通过store_id查找卖家
             result = conn.user_store_col.find_one({"store_id": store_id}, {"store_id": 1, "user_id": 1})
             if result is None:
                 return error.error_non_exist_store_id(store_id)
@@ -144,6 +159,8 @@ class Buyer(db_conn.DBConn):
             #     "SELECT book_id, count, price FROM new_order_detail WHERE order_id = ?;",
             #     (order_id,),
             # )
+
+            # 通过order_id查找购买书籍并计算价格总和
             result = conn.new_order_detail_col.find({"order_id": order_id}, {"book_id": 1, "count": 1, "price": 1})
             total_price = 0
             for row in result:
@@ -151,6 +168,7 @@ class Buyer(db_conn.DBConn):
                 price = row["price"]
                 total_price = total_price + price * count
 
+            # 如果用户余额不够付钱,则error
             if balance < total_price:
                 return error.error_not_sufficient_funds(order_id)
 
@@ -162,45 +180,23 @@ class Buyer(db_conn.DBConn):
             # if cursor.rowcount == 0:
             #     return error.error_not_sufficient_funds(order_id)
 
+            # 买家用户减去余额
             result = conn.user_col.update_one({"user_id": user_id, "balance": {"$gte": total_price}},
                                               {"$inc": {"balance": -total_price}})
 
             if result.modified_count == 0:
                 return error.error_not_sufficient_funds(order_id)
 
-            # cursor = conn.execute(
-            #     "UPDATE user set balance = balance + ?" "WHERE user_id = ?",
-            #     (total_price, buyer_id),
-            # )
-
-            # if cursor.rowcount == 0:
-            #     return error.error_non_exist_user_id(buyer_id)
-
-            result = conn.user_col.update_one({"user_id": buyer_id}, {"$inc": {"balance": total_price}})
+            # 卖家用户增加余额
+            result = conn.user_col.update_one({"user_id": seller_id}, {"$inc": {"balance": total_price}})
 
             if result.modified_count == 0:
-                return error.error_non_exist_user_id(buyer_id)
+                return error.error_non_exist_user_id(seller_id)
 
-            # cursor = conn.execute(
-            #     "DELETE FROM new_order WHERE order_id = ?", (order_id,)
-            # )
-            # if cursor.rowcount == 0:
-            #     return error.error_invalid_order_id(order_id)
-
-            result = conn.new_order_col.delete_one({"order_id": order_id})
-
-            if result.deleted_count == 0:
-                return error.error_invalid_order_id(order_id)
-
-            # cursor = conn.execute(
-            #     "DELETE FROM new_order_detail where order_id = ?", (order_id,)
-            # )
-            # if cursor.rowcount == 0:
-            #     return error.error_invalid_order_id(order_id)
-
-            result = conn.new_order_detail_col.delete_one({"order_id": order_id})
-            if result.deleted_count == 0:
-                return error.error_invalid_order_id(order_id)
+            # 支付完毕修改订单状态
+            result = conn.new_order_col.update_one({"order_id": order_id}, {"$set": {"payment_status": "paid"}})  # 已支付
+            if result.modified_count == 0:
+                return error.error_non_order_pay(order_id)
 
         except pymongo.errors.PyMongoError as e:
             return 528, "{}".format(str(e))
@@ -243,4 +239,121 @@ class Buyer(db_conn.DBConn):
         except BaseException as e:
             return 530, "{}".format(str(e))
 
+        return 200, "ok"
+
+    # 删除订单操作
+    def delete_order(self, user_id, order_id) -> (int, str):
+        try:
+            # 获取订单信息
+            order = self.conn.new_order_col.find_one({"order_id": order_id})
+            # 判断有无订单删除
+            if order is None:
+                return error.error_non_order_delete(user_id)
+            payment_status = order["payment_status"]
+            # 如果有订单
+            if payment_status == "paid":
+                # 按照order_id查找store_id并存储
+                row = self.conn.new_order_col.find_one({"order_id": order_id},
+                                                       {"store_id": 1})
+                if row is None:
+                    return error.error_invalid_order_id(order_id)
+                store_id = row["store_id"]
+
+                # 通过store_id查找卖家
+                seller_id = self.conn.user_store_col.find_one({"store_id": store_id}, {"user_id": 1})
+                if seller_id is None:
+                    return error.error_non_exist_store_id(store_id)
+
+                if not self.user_id_exist(seller_id):
+                    return error.error_non_exist_user_id(seller_id)
+                # 如果支付状态是"paid"
+                # 通过order_id查找购买书籍并计算价格总和
+                result = self.conn.new_order_detail_col.find({"order_id": order_id},
+                                                             {"count": 1, "price": 1})
+                total_price = 0
+                for row in result:
+                    count = row["count"]
+                    price = row["price"]
+                    total_price = total_price + price * count
+
+                # 用户余额返回
+                self.conn.user_col.update_one({"user_id": user_id},
+                                              {"$inc": {"balance": total_price}})
+
+                # 卖家用户增加余额
+                result = self.conn.user_col.update_one({"user_id": seller_id}, {"$inc": {"balance": -total_price}})
+                if result.modified_count == 0:
+                    return error.error_non_exist_user_id(seller_id)
+
+                # 删除状态为"no_pay"与"paid"的订单
+                self.conn.new_order_col.delete_many(
+                    {"order_id": order_id})
+                self.conn.new_order_detail_col.delete_many(
+                    {"order_id": order_id})
+
+            elif payment_status == "no_pay":
+                # 还未付款直接删除,无需退钱
+                # 删除状态为"no_pay"与"paid"的订单
+                self.conn.new_order_col.delete_many(
+                    {"order_id": order_id})
+                self.conn.new_order_detail_col.delete_many(
+                    {"order_id": order_id})
+            else:
+                return error.error_unable_to_delete(order_id)
+
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return 200, "ok"
+
+    def search_order(self, user_id) -> (int, str):
+        try:
+            # 搜索前遍历订单删除超时订单
+            current_time = int(time.time())
+            payment_overtime_order_ids = [order['order_id'] for order in
+                                          self.conn.new_order_col.find({"payment_ddl": {"$lt": current_time},
+                                                                        "payment_status": "no_pay"},
+                                                                       {"order_id": 1})]
+            self.conn.new_order_col.delete_many({"order_id": {"$in": payment_overtime_order_ids}})
+            self.conn.new_order_detail_col.delete_many({"order_id": {"$in": payment_overtime_order_ids}})
+
+            # 将用户作为买家进行搜索
+            buyer_order_ids = [order['order_id'] for order in
+                               self.conn.new_order_col.find({"user_id": user_id}, {"order_id": 1})]
+
+            if not buyer_order_ids:
+                return error.empty_order_search(user_id)
+
+            self.conn.new_order_col.find({"order_id": {"$in": buyer_order_ids}}, {})
+
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return 200, "ok"
+
+
+    def receive(self, user_id: str, store_id: str, order_id: str) -> (int, str):
+        try:
+            result = self.conn.new_order_col.find_one({"order_id": order_id})
+            if result is None:
+                return 503, "订单不存在"
+
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)
+
+            if not self.store_id_exist(store_id):
+                return error.error_non_exist_store_id(store_id)
+
+            result = self.conn.new_order_col.find_one({"order_id": order_id})
+            status = result['status']
+
+            if status == "no_pay":
+                return 521, {"no_pay"}
+            elif status == "paid":
+                return 522, {"no_shipped"}
+            elif status == "received":
+                return 523, {"received"}
+
+            self.conn.new_order_col.update_one({"order_id": order_id}, {"$set": {"status": 'received'}})  # 已收货
+
+        except BaseException as e:
+            return 532, "{}".format(str(e))
         return 200, "ok"

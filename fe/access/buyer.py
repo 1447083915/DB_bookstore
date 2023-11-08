@@ -48,3 +48,37 @@ class Buyer:
         headers = {"token": self.token}
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
+
+    # 发送delete_order的删除请求,内容包括user_id
+    def delete_order(self, order_id: str):
+        json = {
+            "user_id": self.user_id,
+            "order_id": order_id
+        }
+        url = urljoin(self.url_prefix, "delete_order")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code
+
+    # 发送搜索订单请求
+    def search_order(self):
+        json = {
+            "user_id": self.user_id
+        }
+        url = urljoin(self.url_prefix, "search_order")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code
+
+    def receive(self, seller_id: str, store_id: str, order_id: str, ) -> int:
+        json = {
+            "user_id": seller_id,
+
+            "store_id": store_id,
+            "order_id": order_id,
+        }
+        # print(simplejson.dumps(json))
+        url = urljoin(self.url_prefix, "receive")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code

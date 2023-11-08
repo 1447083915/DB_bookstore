@@ -40,3 +40,35 @@ def add_funds():
     b = Buyer()
     code, message = b.add_funds(user_id, password, add_value)
     return jsonify({"message": message}), code
+
+
+# 接受删除订单请求并调用后端逻辑实现
+@bp_buyer.route("/delete_order", methods=["POST"])
+def delete_order():
+    # 请求需传入user_id
+    user_id: str = request.json.get("user_id")
+    order_id: str = request.json.get("order_id")
+    b = Buyer()
+    code, message = b.delete_order(user_id, order_id)
+    return jsonify({"message": message}), code
+
+
+# 接收搜索订单请求
+@bp_buyer.route("/search_order", methods=["POST"])
+def search_order():
+    # 请求需传入user_id
+    user_id: str = request.json.get("user_id")
+    b = Buyer()
+    code, message = b.search_order(user_id)
+    return jsonify({"message": message}), code
+
+
+@bp_buyer.route("/receive", methods=["POST"])
+def receive():
+    user_id: str = request.json.get("user_id")
+    order_id: str = request.json.get("order_id")
+    store_id: str = request.json.get("store_id")
+    b = Buyer()
+    code, message = b.receive(user_id, store_id, order_id)
+    return jsonify({"message": message}), code
+

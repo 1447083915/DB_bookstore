@@ -52,3 +52,25 @@ class Seller:
         headers = {"token": self.token}
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
+
+    # 发送搜索订单请求
+    def search_order(self):
+        json = {
+            "user_id": self.seller_id
+        }
+        url = urljoin(self.url_prefix, "search_order")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code
+
+    def deliver(self, seller_id: str, store_id: str, order_id: str, ) -> int:
+        json = {
+            "user_id": seller_id,
+            "store_id": store_id,
+            "order_id": order_id,
+        }
+        # print(simplejson.dumps(json))
+        url = urljoin(self.url_prefix, "deliver")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code

@@ -56,7 +56,7 @@ class Store:
         self.new_order_detail_col = self.db['new_order_detail']
 
     def init_collections(self):
-        self.db.users.create_index([("user_id", pymongo.ASCENDING)], unique=True)
+        self.db.user.create_index([("user_id", pymongo.ASCENDING)], unique=True)
         self.db.user_store.create_index([("user_id", pymongo.ASCENDING), ("store_id", pymongo.ASCENDING)], unique=True)
         self.db.store.create_index([("store_id", pymongo.ASCENDING), ("book_id", pymongo.ASCENDING)], unique=True)
         self.db.new_order.create_index([("order_id", pymongo.ASCENDING)], unique=True)

@@ -24,32 +24,20 @@ class Buyer(db_conn.DBConn):
 
             for book_id, count in id_and_count:
 
-                # cursor = self.conn.execute(
-                #     "SELECT book_id, stock_level, book_info FROM store "
-                #     "WHERE store_id = ? AND book_id = ?;",
-                #     (store_id, book_id),
-                # )
-                # row = cursor.fetchone()
                 row = self.conn.store_col.find_one({"book_id": book_id, "store_id": store_id},
-                                                   {"book_id": 1, "stock_level": 1, "book_info": 1})
+                                                   {"book_id": 1, "stock_level": 1, "book_price": 1})
                 if row is None:
                     return error.error_non_exist_book_id(book_id) + (order_id,)
 
                 stock_level = row["stock_level"]
-                book_info = row["book_info"]
-                book_info_json = json.loads(book_info)
-                price = book_info_json.get("price")
+                # book_info = row["book_info"]
+                # book_info_json = json.loads(book_info)
+                # price = book_info_json.get("price")
+                price = row["book_price"]
 
                 if stock_level < count:
                     return error.error_stock_level_low(book_id) + (order_id,)
 
-                # cursor = self.conn.execute(
-                #     "UPDATE store set stock_level = stock_level - ? "
-                #     "WHERE store_id = ? and book_id = ? and stock_level >= ?; ",
-                #     (count, store_id, book_id, count),
-                # )
-                # if cursor.rowcount == 0:
-                #     return error.error_stock_level_low(book_id) + (order_id,)
                 result = self.conn.store_col.update_one(
                     {"store_id": store_id, "book_id": book_id, "stock_level": {"$gte": count}},
                     {"$inc": {"stock_level": -count}})
@@ -57,19 +45,9 @@ class Buyer(db_conn.DBConn):
                 if result.modified_count == 0:
                     return error.error_stock_level_low(book_id) + (order_id,)
 
-                # self.conn.execute(
-                #     "INSERT INTO new_order_detail(order_id, book_id, count, price) "
-                #     "VALUES(?, ?, ?, ?);",
-                #     (uid, book_id, count, price),
-                # )
                 self.conn.new_order_detail_col.insert_one(
                     {"order_id": uid, "book_id": book_id, "count": count, "price": price})
 
-            # self.conn.execute(
-            #     "INSERT INTO new_order(order_id, store_id, user_id) "
-            #     "VALUES(?, ?, ?);",
-            #     (uid, store_id, user_id),
-            # )
             self.conn.new_order_col.insert_one({"order_id": uid, "store_id": store_id, "user_id": user_id})
             order_id = uid
 
@@ -81,21 +59,10 @@ class Buyer(db_conn.DBConn):
     def payment(self, user_id: str, password: str, order_id: str) -> (int, str):
         conn = self.conn
         try:
-            # cursor = conn.execute(
-            #     "SELECT order_id, user_id, store_id FROM new_order WHERE order_id = ?",
-            #     (order_id,),
-            # )
-            # row = cursor.fetchone()
-            # if row is None:
-            #     return error.error_invalid_order_id(order_id)
 
             row = conn.new_order_col.find_one({"order_id": order_id}, {"order_id": 1, "user_id": 1, "store_id": 1})
             if row is None:
                 return error.error_invalid_order_id(order_id)
-
-            # order_id = row[0]
-            # buyer_id = row[1]
-            # store_id = row[2]
 
             order_id = row["order_id"]
             buyer_id = row["user_id"]
@@ -104,32 +71,12 @@ class Buyer(db_conn.DBConn):
             if buyer_id != user_id:
                 return error.error_authorization_fail()
 
-            # cursor = conn.execute(
-            #     "SELECT balance, password FROM user WHERE user_id = ?;", (buyer_id,)
-            # )
-            # row = cursor.fetchone()
-            # if row is None:
-            #     return error.error_non_exist_user_id(buyer_id)
-            # balance = row[0]
-            # if password != row[1]:
-            #     return error.error_authorization_fail()
-
             result = conn.user_col.find_one({"user_id": buyer_id}, {"balance": 1, "password": 1})
             if result is None:
                 return error.error_non_exist_user_id(buyer_id)
             balance = result["balance"]
             if password != result["password"]:
                 return error.error_authorization_fail()
-
-            # cursor = conn.execute(
-            #     "SELECT store_id, user_id FROM user_store WHERE store_id = ?;",
-            #     (store_id,),
-            # )
-            # row = cursor.fetchone()
-            # if row is None:
-            #     return error.error_non_exist_store_id(store_id)
-
-            # seller_id = row[1]
 
             result = conn.user_store_col.find_one({"store_id": store_id}, {"store_id": 1, "user_id": 1})
             if result is None:
@@ -140,10 +87,6 @@ class Buyer(db_conn.DBConn):
             if not self.user_id_exist(seller_id):
                 return error.error_non_exist_user_id(seller_id)
 
-            # cursor = conn.execute(
-            #     "SELECT book_id, count, price FROM new_order_detail WHERE order_id = ?;",
-            #     (order_id,),
-            # )
             result = conn.new_order_detail_col.find({"order_id": order_id}, {"book_id": 1, "count": 1, "price": 1})
             total_price = 0
             for row in result:
@@ -154,49 +97,19 @@ class Buyer(db_conn.DBConn):
             if balance < total_price:
                 return error.error_not_sufficient_funds(order_id)
 
-            # cursor = conn.execute(
-            #     "UPDATE user set balance = balance - ?"
-            #     "WHERE user_id = ? AND balance >= ?",
-            #     (total_price, buyer_id, total_price),
-            # )
-            # if cursor.rowcount == 0:
-            #     return error.error_not_sufficient_funds(order_id)
-
             result = conn.user_col.update_one({"user_id": user_id, "balance": {"$gte": total_price}},
                                               {"$inc": {"balance": -total_price}})
 
             if result.modified_count == 0:
                 return error.error_not_sufficient_funds(order_id)
 
-            # cursor = conn.execute(
-            #     "UPDATE user set balance = balance + ?" "WHERE user_id = ?",
-            #     (total_price, buyer_id),
-            # )
-
-            # if cursor.rowcount == 0:
-            #     return error.error_non_exist_user_id(buyer_id)
-
             result = conn.user_col.update_one({"user_id": buyer_id}, {"$inc": {"balance": total_price}})
-
             if result.modified_count == 0:
                 return error.error_non_exist_user_id(buyer_id)
 
-            # cursor = conn.execute(
-            #     "DELETE FROM new_order WHERE order_id = ?", (order_id,)
-            # )
-            # if cursor.rowcount == 0:
-            #     return error.error_invalid_order_id(order_id)
-
             result = conn.new_order_col.delete_one({"order_id": order_id})
-
             if result.deleted_count == 0:
                 return error.error_invalid_order_id(order_id)
-
-            # cursor = conn.execute(
-            #     "DELETE FROM new_order_detail where order_id = ?", (order_id,)
-            # )
-            # if cursor.rowcount == 0:
-            #     return error.error_invalid_order_id(order_id)
 
             result = conn.new_order_detail_col.delete_one({"order_id": order_id})
             if result.deleted_count == 0:
@@ -212,15 +125,6 @@ class Buyer(db_conn.DBConn):
 
     def add_funds(self, user_id, password, add_value) -> (int, str):
         try:
-            # cursor = self.conn.execute(
-            #     "SELECT password  from user where user_id=?", (user_id,)
-            # )
-            # row = cursor.fetchone()
-            # if row is None:
-            #     return error.error_authorization_fail()
-
-            # if row[0] != password:
-            #     return error.error_authorization_fail()
 
             row = self.conn.user_col.find_one({"user_id": user_id}, {"password": 1})
             if row is None:
@@ -229,17 +133,35 @@ class Buyer(db_conn.DBConn):
             if row.get("password") != password:
                 return error.error_authorization_fail()
 
-            # cursor = self.conn.execute(
-            #     "UPDATE user SET balance = balance + ? WHERE user_id = ?",
-            #     (add_value, user_id),
-            # )
-            # if cursor.rowcount == 0:
-            #     return error.error_non_exist_user_id(user_id)
-
             result = self.conn.user_col.update_one({"user_id": user_id}, {"$inc": {"balance": add_value}})
             if result.modified_count == 0:
                 return error.error_non_exist_user_id(user_id)
 
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+
+        return 200, "ok"
+
+    def book_search(self, store_id, book_id, book_title, book_tags, book_author):
+        try:
+            # if not self.store_id_exist(store_id):
+            #     return error.error_non_exist_store_id(store_id)
+            query_conditions = {}
+            if store_id:
+                query_conditions["store_id"] = store_id
+            if book_id:
+                query_conditions["book_id"] = book_id
+            if book_title:
+                query_conditions["book_title"] = book_title
+            if book_tags:
+                query_conditions["book_tags"] = book_tags
+            if book_author:
+                query_conditions["book_author"] = book_author
+
+            result = self.conn.store_col.find(query_conditions, {})
+
+            if result is None:
+                return error.error_non_exist_book_id(book_id)
         except BaseException as e:
             return 530, "{}".format(str(e))
 

@@ -7,7 +7,9 @@ class Seller(db_conn.DBConn):
     def __init__(self):
         db_conn.DBConn.__init__(self)
 
-    def add_book(self, user_id: str, store_id: str, book_id: str, book_json_str: str, stock_level: int):
+    def add_book(self, user_id: str, store_id: str, book_id: str, book_title: str, book_tags, book_author,
+                 book_price: str,
+                 stock_level: int):
         try:
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)
@@ -16,11 +18,13 @@ class Seller(db_conn.DBConn):
             if self.book_id_exist(store_id, book_id):
                 return error.error_exist_book_id(book_id)
 
-
             data = {
                 "store_id": store_id,
                 "book_id": book_id,
-                "book_info": book_json_str,
+                "book_title": book_title,
+                "book_tags": book_tags,
+                "book_author": book_author,
+                "book_price": book_price,
                 "stock_level": stock_level
             }
             # 插入数据到MongoDB
@@ -63,11 +67,6 @@ class Seller(db_conn.DBConn):
                 return error.error_non_exist_user_id(user_id)
             if self.store_id_exist(store_id):
                 return error.error_exist_store_id(store_id)
-
-            # 检查是否已存在相同的store_id
-            # existing_store = self.conn.user_store_col.find_one({"store_id": store_id})
-            # if existing_store:
-            #     return 532, "店铺已经存在"
 
             data = {
                 "store_id": store_id,

@@ -2,6 +2,7 @@ import requests
 import simplejson
 from urllib.parse import urljoin
 from fe.access.auth import Auth
+from fe.access import book
 
 
 class Buyer:
@@ -38,7 +39,7 @@ class Buyer:
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
 
-    def add_funds(self, add_value: str) -> int:
+    def add_funds(self, add_value: int):
         json = {
             "user_id": self.user_id,
             "password": self.password,
@@ -48,3 +49,17 @@ class Buyer:
         headers = {"token": self.token}
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
+
+    def book_search(self, store_id: str, book_id, book_title, book_tags, book_author):
+        json = {
+            "store_id": store_id,
+            "book_id": book_id,
+            "book_title": book_title,
+            "book_tags": book_tags,
+            "book_author": book_author
+        }
+        url = urljoin(self.url_prefix, "search_book")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code
+

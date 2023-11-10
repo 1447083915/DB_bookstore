@@ -127,7 +127,7 @@ class Seller(db_conn.DBConn):
             elif status == "shipped" or status == "received":
                 return 522, {"shipped"}
 
-            self.conn.new_order_col.update_one({"order_id": order_id}, {"$set": {"status": 'shipped'}})  # 已发货
+            self.conn.new_order_col.update_one({"order_id": order_id}, {"$set": {"payment_status": 'shipped'}})  # 已发货
 
         except BaseException as e:
             return 531, "{}".format(str(e))

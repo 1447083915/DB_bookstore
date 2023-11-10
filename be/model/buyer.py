@@ -226,7 +226,7 @@ class Buyer(db_conn.DBConn):
                 self.conn.user_col.update_one({"user_id": user_id},
                                               {"$inc": {"balance": total_price}})
 
-                # 卖家用户增加余额
+                # 卖家用户减少余额
                 result = self.conn.user_col.update_one({"user_id": seller_id}, {"$inc": {"balance": -total_price}})
                 if result.modified_count == 0:
                     return error.error_non_exist_user_id(seller_id)
@@ -287,8 +287,7 @@ class Buyer(db_conn.DBConn):
             if not self.store_id_exist(store_id):
                 return error.error_non_exist_store_id(store_id)
 
-            result = self.conn.new_order_col.find_one({"order_id": order_id})
-            status = result['status']
+            status = result['payment_status']
 
             if status == "no_pay":
                 return 521, {"no_pay"}
@@ -297,7 +296,7 @@ class Buyer(db_conn.DBConn):
             elif status == "received":
                 return 523, {"received"}
 
-            self.conn.new_order_col.update_one({"order_id": order_id}, {"$set": {"status": 'received'}})  # 已收货
+            self.conn.new_order_col.update_one({"order_id": order_id}, {"$set": {"payment_status": 'received'}})  # 已收货
 
         except BaseException as e:
             return 532, "{}".format(str(e))
